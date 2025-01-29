@@ -132,6 +132,8 @@ rm -f camilladsp.tar.gz
 
 ### Building CamillaGUI
 
+install_temporarily_if_missing git
+install_temporarily_if_missing compiletc
 install_if_missing python3.11
 install_temporarily_if_missing python3.11-pip
 $use32bit && install_temporarily_if_missing python3.11-dev
