@@ -106,8 +106,9 @@ volume:
 
 sudo chmod 664 /etc/asound.conf
 sudo chown root:staff /etc/asound.conf
-sudo echo "options snd-aloop" > /etc/modprobe.d/snd-aloop.conf
-
+echo "options snd-aloop" > /tmp/snd-aloop.conf
+sudo cp /tmp/snd-aloop.conf /etc/modprobe.d/snd-aloop.conf
+echo "etc/modprobe.d/snd-aloop.conf" >> /opt/.filetool.lst
 
 ### Set Squeezelite and Shairport output to CamillaDSP
 

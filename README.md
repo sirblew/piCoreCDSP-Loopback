@@ -1,6 +1,7 @@
 # piCoreCDSP
 The goal of this project is to provide an easy way to install [CamillaDSP](https://github.com/HEnquist/camilladsp) 3.0.0 including [GUI](https://github.com/HEnquist/camillagui-backend)
-and automatic samplerate switching on a [piCorePlayer](https://www.picoreplayer.org/) installation.
+on a [piCorePlayer](https://www.picoreplayer.org/) installation. This fork excludes the alsa_csdp plugin which does the sample rate switching. It's buggy and hasn't been updated on over two years. It uses the ALSA Loopback device instead, which requires a constant sample rate. 
+This means that Squeezelite does the resampling of all audio.
 
 ## Requirements
 - a fresh piCorePlayer 9.2.0 installation without any modifications
