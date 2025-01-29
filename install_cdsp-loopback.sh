@@ -1,6 +1,5 @@
 #!/bin/sh -e
 
-ALSA_CDSP_VERSION="a2a16745581cc3da7b28df14f4fdf169d6452f89" # https://github.com/spfenwick/alsa_cdsp/commits/master/
 CDSP_VERSION="v3.0.0"  # https://github.com/HEnquist/camilladsp/releases/tag/v3.0.0
 CAMILLA_GUI_VERSION="v3.0.0"  # https://github.com/HEnquist/camillagui-backend/releases
 PYCDSP_VERSION="v3.0.0"  # https://github.com/HEnquist/pycamilladsp/releases
@@ -66,18 +65,19 @@ cd /mnt/mmcblk0p2/tce/camilladsp
 
 echo '
 devices:
-  samplerate: 44100
+  samplerate: 192000
   chunksize: 2048
   queuelimit: 4
   capture:
     type: Stdin
     channels: 2
-    format: S16LE
+    device:  "hw:CARD=Loopback,DEV=0"
+    format: S32LE
   playback:
     type: Alsa
     channels: 2
-    device:  "null"
-    format: S16LE
+    device:  "hdmi:CARD=vc4hdmi,DEV=0"
+    format: S24LE
 filters: []
 mixers: {}
 processors: []
@@ -102,79 +102,17 @@ volume:
 ' > camilladsp_statefile.yml
 
 
-### Building ALSA CDSP plugin
-
-install_temporarily_if_missing git
-install_temporarily_if_missing compiletc
-install_temporarily_if_missing libasound-dev
-
-cd /tmp
-git clone https://github.com/spfenwick/alsa_cdsp.git
-cd /tmp/alsa_cdsp
-git checkout $ALSA_CDSP_VERSION
-make
-sudo make install
-cd /tmp
-rm -rf alsa_cdsp/
-
-cd $BUILD_DIR
-mkdir -p usr/local/lib/alsa-lib/
-sudo mv /usr/local/lib/alsa-lib/libasound_module_pcm_cdsp.so usr/local/lib/alsa-lib/libasound_module_pcm_cdsp.so
-
-
-### Installing ALSA CDSP config
+### Configuring ALSA 
 
 sudo chmod 664 /etc/asound.conf
 sudo chown root:staff /etc/asound.conf
-
-# Remove old configuration, in case it was installed before
-cat /etc/asound.conf |\
- tr '\n' '\r' |\
-  sed 's|\r\r# For more info about this configuration see: https://github.com/scripple/alsa_cdsp\rpcm.camilladsp.*\r}\r# pcm.camilladsp||' |\
-  sed 's|\r\r# For more info about this configuration see: https://github.com/spfenwick/alsa_cdsp\rpcm.camilladsp.*\r}\r# pcm.camilladsp||' |\
-   tr '\r' '\n' > /tmp/asound.conf
-cat /tmp/asound.conf > /etc/asound.conf
-
-echo '
-# For more info about this configuration see: https://github.com/spfenwick/alsa_cdsp
-pcm.camilladsp {
-    type cdsp
-    cpath "/usr/local/camilladsp"
-
-####################################
-# Set the values for your DAC here #
-####################################
-    min_channels 1
-    max_channels 8
-    rates = [
-        44100
-        48000
-        88200
-        96000
-        176400
-        192000
-        352800
-        384000
-    ]
-
-   cargs [
-# Uncomment, if you want more detailed logging output
-#        -v
-        -p "1234"
-        -a "0.0.0.0"
-        -o "/tmp/camilladsp.log"
-        --statefile "/mnt/mmcblk0p2/tce/camilladsp/camilladsp_statefile.yml"
-   ]
-
-}
-# pcm.camilladsp
-' >> /etc/asound.conf
+sudo echo "options snd-aloop" > /etc/modprobe.d/snd-aloop.conf
 
 
 ### Set Squeezelite and Shairport output to CamillaDSP
 
-sed 's/^OUTPUT=.*/OUTPUT="camilladsp"/' -i /usr/local/etc/pcp/pcp.cfg
-sed 's/^SHAIRPORT_OUT=.*/SHAIRPORT_OUT="camilladsp"/' -i /usr/local/etc/pcp/pcp.cfg
+sed 's/^OUTPUT=.*/OUTPUT="hw:CARD=Loopback,DEV=1"/' -i /usr/local/etc/pcp/pcp.cfg
+sed 's/^SHAIRPORT_OUT=.*/SHAIRPORT_OUT="hw:CARD=Loopback,DEV=0"/' -i /usr/local/etc/pcp/pcp.cfg
 
 
 ### Downloading CamillaDSP
