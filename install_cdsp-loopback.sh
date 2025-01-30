@@ -106,9 +106,10 @@ volume:
 
 sudo chmod 664 /etc/asound.conf
 sudo chown root:staff /etc/asound.conf
-echo "options snd-aloop" > /tmp/snd-aloop.conf
-sudo cp /tmp/snd-aloop.conf /etc/modprobe.d/snd-aloop.conf
-echo "etc/modprobe.d/snd-aloop.conf" >> /opt/.filetool.lst
+sudo echo '
+# ALSA Loopback interface
+snd_aloop' >> /etc/modprobe.conf
+echo 'etc/modprobe.conf' >> /opt/.filetool.lst
 
 ### Set Squeezelite and Shairport output to CamillaDSP
 
@@ -179,7 +180,7 @@ sudo mv /usr/local/camillagui ${BUILD_DIR}/usr/local/
 mkdir -p ${BUILD_DIR}/usr/local/tce.installed/
 cd ${BUILD_DIR}/usr/local/tce.installed/
 echo "#!/bin/sh
-
+sudo -u tc /usr/local/camilladsp -s /mnt/mmcblk0p2/tce/camilladsp/camilladsp_statefile.yml -g-30 -p 1234 -o /tmp/camilladsp.log -w &
 sudo -u tc sh -c 'while [ ! -f /usr/local/bin/python3 ]; do sleep 1; done
 source /usr/local/camillagui/environment/bin/activate
 python3 /usr/local/camillagui/main.py &' &" > piCoreCDSP
