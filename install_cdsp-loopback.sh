@@ -1,9 +1,20 @@
 #!/bin/sh -e
 
+# Set version numbers
+PCP_VERSION="9.2.0" # https://docs.picoreplayer.org/releases/pcp920/
 CDSP_VERSION="v3.0.0"  # https://github.com/HEnquist/camilladsp/releases/tag/v3.0.0
 CAMILLA_GUI_VERSION="v3.0.0"  # https://github.com/HEnquist/camillagui-backend/releases
 PYCDSP_VERSION="v3.0.0"  # https://github.com/HEnquist/pycamilladsp/releases
 PYCDSP_PLOT_VERSION="v3.0.0"  # https://github.com/HEnquist/pycamilladsp-plot/releases
+
+# Configure audio devices 
+ALSA_SOUNDCARD="hdmi:CARD=vc4hdmi,DEV=0"
+ALSA_MAX_SAMPLERATE="192000"
+ALSA_FORMAT="S24LE"
+ALSA_LOOPBACK_PLAYBACK="hw:CARD=Loopback,DEV=0"
+ALSA_LOOPBACK_CAPTURE="hw:CARD=Loopback,DEV=1"
+ALSA_PARAMS="160:4:24:1:" # Bit depth set in the third field here must be the same as $ALSA_FORMAT above
+RESAMPLE_RECIPE="vX::3.05:28:95:105:45"
 
 BUILD_DIR="/tmp/piCoreCDSP"
 
@@ -55,6 +66,22 @@ install_temporarily_if_missing(){
 
 set -v
 
+# Fix issue with vc4hdmi HDMI driver on Pi3/2/1
+# if 32 bit architecture
+#if $use32bit; then
+# If Pi version is less than 4
+PiVersion=`cat /proc/cpuinfo | grep '^Model' | awk '{print $5}'`
+if [ $PiVersion -lt 4 ] ; then
+	install_temporarily_if_missing squashfs-tools
+	tce-load -wi squashfs-tools
+	mkdir /tmp/fixhdmi
+	cd /tmp/fixhdmi
+	unsquashfs /mnt/mmcblk0p2/tce/optional/pcp-$PCP_VERSION-www.tcz
+	cat /usr/local/share/pcp/cards/HDMI0vc4.conf | sed -e 's/vc4hdmi0/vc4hdmi/g' > squashfs-root/usr/local/share/pcp/cards/HDMI0vc4.conf
+	mksquashfs squashfs-root pcp-$PCP_VERSION-www.tcz
+	sudo cp pcp-$PCP_VERSION-www.tcz /mnt/mmcblk0p2/tce/optional/
+fi
+
 
 ### Creating CDSP data folders with default configuration
 
@@ -63,30 +90,49 @@ mkdir -p camilladsp/configs
 mkdir -p camilladsp/coeffs
 cd /mnt/mmcblk0p2/tce/camilladsp
 
-echo '
+echo "
 devices:
-  samplerate: 192000
-  chunksize: 2048
+  capture_samplerate: "$ALSA_MAX_SAMPLERATE"
+  chunksize: 4096
+  enable_rate_adjust: true
   queuelimit: 4
   capture:
     type: Stdin
     channels: 2
-    device:  "hw:CARD=Loopback,DEV=0"
-    format: S32LE
+    device:  "$ALSA_LOOPBACK_CAPTURE"
+    format: "$ALSA_FORMAT"
   playback:
     type: Alsa
     channels: 2
-    device:  "hdmi:CARD=vc4hdmi,DEV=0"
-    format: S24LE
-filters: []
-mixers: {}
-processors: []
-pipeline: []
-' > default_config.yml
-/bin/cp default_config.yml configs/Null.yml
+    device:  "$ALSA_SOUNDCARD"
+    format: "$ALSA_FORMAT"
+  samplerate: "$ALSA_MAX_SAMPLERATE"
+  target_level: 8191  
+filters: 
+  Bass:
+    description: null
+    parameters:
+      freq: 90
+      gain: 0
+      q: 0.9
+      type: Lowshelf
+    type: Biquad
+  Treble:
+    description: null
+    parameters:
+      freq: 6500
+      gain: 0
+      q: 0.7
+      type: Highshelf
+    type: Biquad
+mixers: 
+processors: 
+pipeline: 
+" > default_config.yml
+/bin/cp default_config.yml configs/Default.yml
 
 echo '
-config_path: /mnt/mmcblk0p2/tce/camilladsp/configs/Null.yml
+config_path: /mnt/mmcblk0p2/tce/camilladsp/configs/Default.yml
 mute:
 - false
 - false
@@ -108,13 +154,17 @@ sudo chmod 664 /etc/asound.conf
 sudo chown root:staff /etc/asound.conf
 sudo echo '
 # ALSA Loopback interface
-snd_aloop' >> /etc/modprobe.conf
-echo 'etc/modprobe.conf' >> /opt/.filetool.lst
+options snd_aloop index=-2' > /etc/modprobe.d/snd-aloop.conf
+echo 'etc/modprobe.d/snd-aloop.conf' >> /opt/.filetool.lst
 
-### Set Squeezelite and Shairport output to CamillaDSP
+### Set Squeezelite and Shairport output to CamillaDSP & Squeezelite to resample to 192KHz in high quality
 
-sed 's/^OUTPUT=.*/OUTPUT="hw:CARD=Loopback,DEV=1"/' -i /usr/local/etc/pcp/pcp.cfg
-sed 's/^SHAIRPORT_OUT=.*/SHAIRPORT_OUT="hw:CARD=Loopback,DEV=0"/' -i /usr/local/etc/pcp/pcp.cfg
+sed -e "s/^OUTPUT=.*/OUTPUT=\"$ALSA_LOOPBACK_PLAYBACK\"/" \
+	-e "s/^ALSA_PARAMS=.*/ALSA_PARAMS=\"$ALSA_PARAMS\"/" \
+	-e "s/^UPSAMPLE=.*/UPSAMPLE=\"$RESAMPLE_RECIPE\"/" \
+	-e "s/^MAX_RATE=.*/MAX_RATE=\"$ALSA_MAX_SAMPLERATE\"/" \
+	-i /usr/local/etc/pcp/pcp.cfg
+sed "s/^SHAIRPORT_OUT=.*/SHAIRPORT_OUT=\"$ALSA_LOOPBACK_PLAYBACK\"/" -i /usr/local/etc/pcp/pcp.cfg
 
 
 ### Downloading CamillaDSP
@@ -154,7 +204,7 @@ wget https://github.com/HEnquist/camillagui-backend/releases/download/${CAMILLA_
 unzip camillagui.zip
 rm -f camillagui.zip
 echo '
-camilla_host: "0.0.0.0"
+camilla_host: "127.0.0.1"
 camilla_port: 1234
 bind_address: "0.0.0.0"
 port: 5000
@@ -180,7 +230,8 @@ sudo mv /usr/local/camillagui ${BUILD_DIR}/usr/local/
 mkdir -p ${BUILD_DIR}/usr/local/tce.installed/
 cd ${BUILD_DIR}/usr/local/tce.installed/
 echo "#!/bin/sh
-sudo -u tc /usr/local/camilladsp -s /mnt/mmcblk0p2/tce/camilladsp/camilladsp_statefile.yml -g-30 -p 1234 -o /tmp/camilladsp.log -w &
+sudo modprobe snd-aloop
+sudo -u tc sh -c '/usr/local/camilladsp -s /mnt/mmcblk0p2/tce/camilladsp/camilladsp_statefile.yml -a 127.0.0.1 -p 1234 -o /tmp/camilladsp.log -w &'
 sudo -u tc sh -c 'while [ ! -f /usr/local/bin/python3 ]; do sleep 1; done
 source /usr/local/camillagui/environment/bin/activate
 python3 /usr/local/camillagui/main.py &' &" > piCoreCDSP
