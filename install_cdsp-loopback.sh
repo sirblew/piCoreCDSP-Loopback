@@ -11,8 +11,8 @@ PYCDSP_PLOT_VERSION="v3.0.0"  # https://github.com/HEnquist/pycamilladsp-plot/re
 ALSA_SOUNDCARD="hdmi:CARD=vc4hdmi,DEV=0"
 ALSA_MAX_SAMPLERATE="192000"
 ALSA_FORMAT="S24LE"
-ALSA_LOOPBACK_PLAYBACK="hw:CARD=Loopback,DEV=0"
-ALSA_LOOPBACK_CAPTURE="hw:CARD=Loopback,DEV=1"
+ALSA_LOOPBACK_PLAYBACK="hw:CARD=Loopback,DEV=1"
+ALSA_LOOPBACK_CAPTURE="hw:CARD=Loopback,DEV=0"
 ALSA_PARAMS="160:4:24:1:" # Bit depth set in the third field here must be the same as $ALSA_FORMAT above
 RESAMPLE_RECIPE="vX::3.05:28:95:105:45"
 
@@ -41,6 +41,13 @@ if [[ $availableSpaceInMB -le $requiredSpaceInMB ]]; then
     >&2 echo "Increase SD-Card size: Main Page > Additional functions > Resize FS"
     exit 1
 fi
+
+# Ensure vc4 driver is configured to ensure /etc/sysconfig/tcedir/onboot.lst loads in correct order
+if ! `lsmod | grep ^vc4 > /dev/null` ; then 
+	>&2 echo "vc4 HDMI driver not loaded. Configure in pCP GUI and run this script again. Squeezelite Settings -> Audio output device settings" 
+	exit 1
+fi
+
 
 ### Ensure fresh build dir exists
 if [ -d $BUILD_DIR ]; then
@@ -74,11 +81,14 @@ set -v
 PiVersion=`cat /proc/cpuinfo | grep '^Model' | awk '{print $5}'`
 if [ $PiVersion -lt 4 ] ; then
 	install_temporarily_if_missing squashfs-tools
-	tce-load -wi squashfs-tools
 	mkdir /tmp/fixhdmi
 	cd /tmp/fixhdmi
 	unsquashfs /mnt/mmcblk0p2/tce/optional/pcp-$PCP_VERSION-www.tcz
-	cat /usr/local/share/pcp/cards/HDMI0vc4.conf | sed -e 's/vc4hdmi0/vc4hdmi/g' > squashfs-root/usr/local/share/pcp/cards/HDMI0vc4.conf
+	AUDIODRIVER=$(grep ^AUDIO= /usr/local/etc/pcp/pcp.cfg | cut -d \" -f 2)
+	cat /usr/local/share/pcp/cards/$AUDIODRIVER.conf | sed \
+		-e 's/vc4hdmi[0-9]/vc4hdmi/g' \
+		-e 's/ALSA_PARAMS=.*/ALSA_PARAMS="160:4:24:1"/' \
+		> squashfs-root/usr/local/share/pcp/cards/$AUDIODRIVER.conf
 	mksquashfs squashfs-root pcp-$PCP_VERSION-www.tcz
 	sudo cp pcp-$PCP_VERSION-www.tcz /mnt/mmcblk0p2/tce/optional/
 fi
@@ -98,14 +108,14 @@ devices:
   enable_rate_adjust: true
   queuelimit: 4
   capture:
-    type: Stdin
+    type: Alsa
     channels: 2
-    device:  "$ALSA_LOOPBACK_CAPTURE"
+    device: "$ALSA_LOOPBACK_CAPTURE"
     format: "$ALSA_FORMAT"
   playback:
     type: Alsa
     channels: 2
-    device:  "$ALSA_SOUNDCARD"
+    device: "$ALSA_SOUNDCARD"
     format: "$ALSA_FORMAT"
   samplerate: "$ALSA_MAX_SAMPLERATE"
   target_level: 8191  
@@ -134,7 +144,7 @@ pipeline:
 if [ -f ~/"$EXAMPLE_CDSP_CONFIG" ] ; then 
 	cp ~/"$EXAMPLE_CDSP_CONFIG" configs/
 else
-	echo "CamillaDSP example configuration file $EXAMPLE_CDSP_CONFIG not found."
+	echo "WARNING: CamillaDSP example configuration file $EXAMPLE_CDSP_CONFIG not found."
 fi
 
 echo '
@@ -158,9 +168,10 @@ volume:
 
 sudo chmod 664 /etc/asound.conf
 sudo chown root:staff /etc/asound.conf
-sudo echo '
-# ALSA Loopback interface
-options snd_aloop index=-2' > /etc/modprobe.d/snd-aloop.conf
+echo '# ALSA Loopback interface
+options snd_aloop index=-2' > snd-aloop.conf
+sudo mv snd-aloop.conf /etc/modprobe.d/
+sudo chown root:root /etc/modprobe.d/snd-aloop.conf
 echo 'etc/modprobe.d/snd-aloop.conf' >> /opt/.filetool.lst
 
 ### Set Squeezelite and Shairport output to CamillaDSP & Squeezelite to resample to 192KHz in high quality
@@ -237,6 +248,7 @@ mkdir -p ${BUILD_DIR}/usr/local/tce.installed/
 cd ${BUILD_DIR}/usr/local/tce.installed/
 echo "#!/bin/sh
 sudo modprobe snd-aloop
+sleep 5
 sudo -u tc sh -c '/usr/local/camilladsp -s /mnt/mmcblk0p2/tce/camilladsp/camilladsp_statefile.yml -a 127.0.0.1 -p 1234 -o /tmp/camilladsp.log -w &'
 sudo -u tc sh -c 'while [ ! -f /usr/local/bin/python3 ]; do sleep 1; done
 source /usr/local/camillagui/environment/bin/activate
@@ -252,7 +264,8 @@ mksquashfs piCoreCDSP piCoreCDSP.tcz
 mv -f piCoreCDSP.tcz /etc/sysconfig/tcedir/optional
 echo "python3.11.tcz" > /etc/sysconfig/tcedir/optional/piCoreCDSP.tcz.dep
 echo piCoreCDSP.tcz >> /etc/sysconfig/tcedir/onboot.lst
-
+cd
+ln -s /tmp/tcloop/piCoreCDSP/usr/local/tce.installed/piCoreCDSP
 
 ### Saving changes and rebooting
 
