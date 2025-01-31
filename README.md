@@ -3,7 +3,7 @@ This is a fork of [piCoreCDSP](https://github.com/JWahle/piCoreCDSP) by [Johanne
 
 The goal of this project is to provide an easy way to turn a Raspberry Pi into an audio streamer with DSP and output to HDMI, such as to an AVR. It will install [CamillaDSP](https://github.com/HEnquist/camilladsp) 3.0.0 including [GUI](https://github.com/HEnquist/camillagui-backend) on a [piCorePlayer](https://www.picoreplayer.org/) installation. 
 
-This fork excludes the alsa_csdp plugin which does the sample rate switching which doesn't seem to work with the HDMI drivers. It uses the ALSA Loopback device instead, which requires a constant sample rate. Squeezelite resamples all audio to the maximum sample rate configured in the script.
+This fork excludes the `alsa_csdp` plugin which doesn't seem to work with the HDMI drivers. Instead, it uses the ALSA Loopback device which requires a constant sample rate. Therefore, Squeezelite is configured to resamples all audio to the configured maximum sample rate using a very high quality resampler.
 
 ## Requirements
 - a fresh piCorePlayer 9.2.0 installation without any modifications
