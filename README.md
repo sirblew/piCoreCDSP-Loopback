@@ -1,7 +1,9 @@
 # piCoreCDSP
-The goal of this project is to provide an easy way to install [CamillaDSP](https://github.com/HEnquist/camilladsp) 3.0.0 including [GUI](https://github.com/HEnquist/camillagui-backend)
-on a [piCorePlayer](https://www.picoreplayer.org/) installation. This fork excludes the alsa_csdp plugin which does the sample rate switching. It's buggy and hasn't been updated on over two years. It uses the ALSA Loopback device instead, which requires a constant sample rate. 
-This means that Squeezelite does the resampling of all audio.
+This is a fork of [piCoreCDSP](https://github.com/JWahle/piCoreCDSP) by [Johannes Wahle](https://github.com/JWahle)
+
+The goal of this project is to provide an easy way to turn a Raspberry Pi into an audio streamer with DSP and output to HDMI, such as to an AVR. It will install [CamillaDSP](https://github.com/HEnquist/camilladsp) 3.0.0 including [GUI](https://github.com/HEnquist/camillagui-backend)on a [piCorePlayer](https://www.picoreplayer.org/) installation. 
+
+This fork excludes the alsa_csdp plugin which does the sample rate switching which doesn't seem to work with the HDMI drivers. It uses the ALSA Loopback device instead, which requires a constant sample rate. Squeezelite resamples all audio to the maximum sample rate configured in the script.
 
 ## Requirements
 - a fresh piCorePlayer 9.2.0 installation without any modifications
@@ -59,6 +61,7 @@ If you have a Raspberry Pi with less than 1 GB of RAM, you might need to increas
 ## How to update
 You can update to the current version, if you have PCP 9.x installed.
 For older versions, updating is difficult and not recommended - just do a fresh install and enjoy life.
+*** Be sure to edit the version numbers set at the top of the script ***
 
 To update, you have to:
 - [remove the piCoreCDSP extension](#picorecdsp-extension)
@@ -105,15 +108,14 @@ If you just restart, some changes will not be persistent. To make all your chang
 ## Implementation
 The `install_cdsp.sh` script downloads the following projects including dependencies
 and installs them with convenient default settings:
-- https://github.com/spfenwick/alsa_cdsp (forked from https://github.com/scripple/alsa_cdsp)
 - https://github.com/HEnquist/camilladsp
 - https://github.com/HEnquist/camillagui-backend
 
 ### Audio Architecture
 ```mermaid
 graph TD;
-    A(Audio Source<br>SqueezeLite/AirPlay/Bluetooth) -- Opens audio stream --> B(CamillaDSP Alsa Plugin);
-    B -- Starts and then sends audio to stdin of CamillaDSP.<br>This will show the green meters in CamillaGUI. --> C(CamillaDSP);
+    A(Audio Source<br>SqueezeLite/AirPlay/Bluetooth) -- Opens audio stream --> B(CamillaDSP Alsa Loopback Device);
+    B -- Sends audio to CamillaDSP.<br>This will show the green meters in CamillaGUI. --> C(CamillaDSP);
     C --> O(Audio output<br>Configured in your CDSP config);
 ```
 
@@ -126,7 +128,7 @@ If this is not the case, replace occurrences of `pcp.local` with the IP-address/
 If you made some changes to the installation script on your local machine and want to run it quickly on the piCorePlayer, 
 run the following command from the location of the script:  
 ```shell
-scp install_cdsp.sh tc@pcp.local:~ && ssh tc@pcp.local "./install_cdsp.sh"
+scp install_cdsp-Loopback.sh tc@pcp.local:~ && ssh tc@pcp.local "./install_cdsp-Loopback.sh"
 ```
 
 ### Running your own python scripts
