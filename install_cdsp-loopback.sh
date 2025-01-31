@@ -17,6 +17,7 @@ ALSA_PARAMS="160:4:24:1:" # Bit depth set in the third field here must be the sa
 RESAMPLE_RECIPE="vX::3.05:28:95:105:45"
 
 BUILD_DIR="/tmp/piCoreCDSP"
+EXAMPLE_CDSP_CONFIG="Loopback.yml"
 
 ### Decide for 64bit or 32bit installation
 if [ "aarch64" = "$(uname -m)" ]; then
@@ -130,6 +131,11 @@ processors:
 pipeline: 
 " > default_config.yml
 /bin/cp default_config.yml configs/Default.yml
+if [ -f ~/"$EXAMPLE_CDSP_CONFIG" ] ; then 
+	cp ~/"$EXAMPLE_CDSP_CONFIG" configs/
+else
+	echo "CamillaDSP example configuration file $EXAMPLE_CDSP_CONFIG not found."
+fi
 
 echo '
 config_path: /mnt/mmcblk0p2/tce/camilladsp/configs/Default.yml
