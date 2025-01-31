@@ -1,7 +1,7 @@
 # piCoreCDSP
 This is a fork of [piCoreCDSP](https://github.com/JWahle/piCoreCDSP) by [Johannes Wahle](https://github.com/JWahle)
 
-The goal of this project is to provide an easy way to turn a Raspberry Pi into an audio streamer with DSP and output to HDMI, such as to an AVR. It will install [CamillaDSP](https://github.com/HEnquist/camilladsp) 3.0.0 including [GUI](https://github.com/HEnquist/camillagui-backend)on a [piCorePlayer](https://www.picoreplayer.org/) installation. 
+The goal of this project is to provide an easy way to turn a Raspberry Pi into an audio streamer with DSP and output to HDMI, such as to an AVR. It will install [CamillaDSP](https://github.com/HEnquist/camilladsp) 3.0.0 including [GUI](https://github.com/HEnquist/camillagui-backend) on a [piCorePlayer](https://www.picoreplayer.org/) installation. 
 
 This fork excludes the alsa_csdp plugin which does the sample rate switching which doesn't seem to work with the HDMI drivers. It uses the ALSA Loopback device instead, which requires a constant sample rate. Squeezelite resamples all audio to the maximum sample rate configured in the script.
 
@@ -114,9 +114,9 @@ and installs them with convenient default settings:
 ### Audio Architecture
 ```mermaid
 graph TD;
-    A(Audio Source<br>SqueezeLite/AirPlay/Bluetooth) -- Opens audio stream --> B(CamillaDSP Alsa Loopback Device);
-    B -- Sends audio to CamillaDSP.<br>This will show the green meters in CamillaGUI. --> C(CamillaDSP);
-    C --> O(Audio output<br>Configured in your CDSP config);
+    A(Audio Source<br>SqueezeLite/AirPlay/Bluetooth) -- Opens audio stream --> B(ALSA loopback device);
+    B -- CamillaDSP captures audio.<br>This will show the green meters in CamillaGUI. --> C(CamillaDSP);
+    C --> O(Audio output<br>Example your AVR via HDMI);
 ```
 
 ## For developers and tinkerers
