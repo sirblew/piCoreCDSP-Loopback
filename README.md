@@ -1,4 +1,4 @@
-# piCoreCDSP
+# piCoreCDSP-Loopback
 
 This script provides an easy way to turn a Raspberry Pi into an audio streamer with DSP and HDMI output, such as to an AVR. It will install [CamillaDSP](https://github.com/HEnquist/camilladsp) 3.0.0 including [GUI](https://github.com/HEnquist/camillagui-backend) on a fresh [piCorePlayer](https://www.picoreplayer.org/) installation. 
 
