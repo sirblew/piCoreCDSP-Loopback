@@ -1,35 +1,46 @@
 # piCoreCDSP
-This is a fork of [piCoreCDSP](https://github.com/JWahle/piCoreCDSP) by [Johannes Wahle](https://github.com/JWahle)
 
-The goal of this project is to provide an easy way to turn a Raspberry Pi into an audio streamer with DSP and output to HDMI, such as to an AVR. It will install [CamillaDSP](https://github.com/HEnquist/camilladsp) 3.0.0 including [GUI](https://github.com/HEnquist/camillagui-backend) on a [piCorePlayer](https://www.picoreplayer.org/) installation. 
+This script provides an easy way to turn a Raspberry Pi into an audio streamer with DSP and HDMI output, such as to an AVR. It will install [CamillaDSP](https://github.com/HEnquist/camilladsp) 3.0.0 including [GUI](https://github.com/HEnquist/camillagui-backend) on a fresh [piCorePlayer](https://www.picoreplayer.org/) installation. 
 
+This is a fork of [piCoreCDSP](https://github.com/JWahle/piCoreCDSP) by [Johannes Wahle](https://github.com/JWahle).
 This fork excludes the `alsa_csdp` plugin which doesn't seem to work with the HDMI drivers. Instead, it uses the ALSA Loopback device which requires a constant sample rate. Therefore, Squeezelite is configured to resamples all audio to the configured maximum sample rate using a very high quality resampler.
 
 ## Requirements
 - a fresh piCorePlayer 9.2.0 installation without any modifications
 - on an armv7 or arch64 compatible device (Raspi 2/3/4/5)
 
-## How to install
-1. Increase piCorePlayer SD Card size to at least 200MB via `Main Page > Additional functions > Resize FS`
-2. Run `install_cdsp.sh` on piCorePlayer from a terminal:
+## Pre-requisite configuration steps
+ * Flash [piCorePlayer](https://docs.picoreplayer.org/releases/pcp920/) 9.2.0 onto an SD card.
+ * Set the password
+ * Enable SSH under the SSH tab on the Security page. No need to reboot just yet.
+ * Update Squeezelite using the Update button on the main page.
+ * Patch piCorePlayer using the Patch Update under piCorePlayer updates on the main page.
+ * Resize the filesystem using the Resize FS button under Additional functions on the main page. Minimum 200MB. Reboot.
+ * For HDMI audio, set the audio device to vc4 (HDMI0) on the Squeezelite Settings page. Reboot. Don't worry if Squeezelite doesn't start again
+  * SSH to piCorePlayer as the default user "tc".
+   - Eg: `ssh tc@pcp` or `ssh tc@<IP of your piCorePlayer>`
+   - [How to find the IP address of your piCorePlayer](https://docs.picoreplayer.org/how-to/determine_your_pcp_ip_address/)
+ 
+## Installation Steps
+2. Run `install_cdsp-loopback.sh` on piCorePlayer from a terminal:
    - SSH onto the piCorePlayer as user `tc`
-     - Usually `ssh tc@pcp.local` or `ssh tc@<IP of your piCorePlayer>`
+     - Eg `ssh tc@pcp.local` or `ssh tc@<IP of your piCorePlayer>`
      - [How to find the IP address of your piCorePlayer](https://docs.picoreplayer.org/how-to/determine_your_pcp_ip_address/)
    - Run  
-     `wget https://github.com/JWahle/piCoreCDSP/raw/main/install_cdsp.sh && chmod u+x install_cdsp.sh && ./install_cdsp.sh`
+     `wget https://github.com/JWahle/piCoreCDSP/raw/main/install_cdsp-loopback.sh && chmod u+x install_cdsp.sh && ./install_cdsp-loopback.sh`
    - Or if you want to run a modified version of the script or an older version, see the [For developers and tinkerers](#for-developers-and-tinkerers) section
 3. Open CamillaGUI in the browser:
    - It will be running on port 5000 of piCorePlayer.  
      Usually can be opened via [pcp.local:5000](http://pcp.local:5000) or `<IP of your piCorePlayer>:5000`
-   - Under `Playback device` enter the settings for your DAC (by default, the Raspi headphone output is used)
+   - Under `Playback device` enter the settings for your DAC/AVR (by default, the Raspi headphone output is used)
      - These HAVE TO BE CORRECT, otherwise CamillaDSP and Squeezelite won't start!
-       - `device`: The Alsa device name of the DAC
+       - `device`: The Alsa device name of the DAC/AVR
          - A list of available devices can be found in `Squeezelite settings > Output setting`
          - If you know the `sampleformat` for your DAC or want to find it through trial and error,
-           then choose a device with `hw:` prefix. Otherwise, use one with `plughw:` prefix.
-       - `channels`: a supported channel count for the DAC  
-         Usually 2 for a stereo DAC.
-       - `sampleformat`: a supported sample format for the DAC. (Only important, when NOT using a `plughw:` device)
+           then choose a device with `hw:` prefix for an external DAC or the `hdmi:` prefix when using the HDMI interface for audio. Otherwise use one with `plughw:` prefix, however this is not advised as it resamples all audio.
+       - `channels`: a supported channel count for the DAC/AVR
+         Usually 2 for a stereo DAC/AVR.
+       - `sampleformat`: a supported sample format for the DAC/AVR. (Only important, when NOT using a `plughw:` device)
    - Hit `Apply and save`
      - You should see channel meters and `State: RUNNING` on the left
      - If things go wrong, check the CamillaDSP log file via the `Show log file` button for more info.
@@ -88,15 +99,7 @@ Then uninstall the piCoreCDSP Extension
 and reboot.
 
 ### piCoreCDSP installation script
-`rm -f /home/tc/install_cdsp.sh`
-
-### CamillaDSP sound device
-Remove the `pcm.camilladsp` entry from `/etc/asound.conf`.
-This is easy to do with the Nano text editor:
-```shell
-tce-load -wil -t /tmp nano
-nano /etc/asound.conf
-```
+`rm -f /home/tc/install_cdsp-loopback.sh`
 
 ### CamillaDSP configuration files and filters
 `rm -rf /etc/sysconfig/tcedir/camilladsp/`
@@ -106,18 +109,10 @@ If you just restart, some changes will not be persistent. To make all your chang
 `pcp backup`
 
 ## Implementation
-The `install_cdsp.sh` script downloads the following projects including dependencies
+The `install_cdsp-loopback.sh` script downloads the following projects including dependencies
 and installs them with convenient default settings:
 - https://github.com/HEnquist/camilladsp
 - https://github.com/HEnquist/camillagui-backend
-
-### Audio Architecture
-```mermaid
-graph TD;
-    A(Audio Source<br>SqueezeLite/AirPlay/Bluetooth) -- Opens audio stream --> B(ALSA loopback device);
-    B -- CamillaDSP captures audio.<br>This will show the green meters in CamillaGUI. --> C(CamillaDSP);
-    C --> O(Audio output<br>Example your AVR via HDMI);
-```
 
 ## For developers and tinkerers
 
