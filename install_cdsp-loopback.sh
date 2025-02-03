@@ -91,6 +91,8 @@ if [ $PiVersion -lt 4 ] ; then
 		> squashfs-root/usr/local/share/pcp/cards/$AUDIODRIVER.conf
 	mksquashfs squashfs-root pcp-$PCP_VERSION-www.tcz
 	sudo cp pcp-$PCP_VERSION-www.tcz /mnt/mmcblk0p2/tce/optional/
+	cd -
+	rm -rf /tmp/fixhdmi
 fi
 
 
@@ -101,8 +103,8 @@ mkdir -p camilladsp/configs
 mkdir -p camilladsp/coeffs
 cd /mnt/mmcblk0p2/tce/camilladsp
 
-echo "
-devices:
+echo \
+"devices:
   capture_samplerate: "$ALSA_MAX_SAMPLERATE"
   chunksize: 4096
   enable_rate_adjust: true
@@ -147,8 +149,8 @@ else
 	echo "WARNING: CamillaDSP example configuration file $EXAMPLE_CDSP_CONFIG not found."
 fi
 
-echo '
-config_path: /mnt/mmcblk0p2/tce/camilladsp/configs/Default.yml
+echo \
+'config_path: /mnt/mmcblk0p2/tce/camilladsp/configs/Default.yml
 mute:
 - false
 - false
@@ -248,11 +250,11 @@ mkdir -p ${BUILD_DIR}/usr/local/tce.installed/
 cd ${BUILD_DIR}/usr/local/tce.installed/
 echo "#!/bin/sh
 sudo modprobe snd-aloop
-sleep 5
-sudo -u tc sh -c '/usr/local/camilladsp -s /mnt/mmcblk0p2/tce/camilladsp/camilladsp_statefile.yml -a 127.0.0.1 -p 1234 -o /tmp/camilladsp.log -w &'
 sudo -u tc sh -c 'while [ ! -f /usr/local/bin/python3 ]; do sleep 1; done
 source /usr/local/camillagui/environment/bin/activate
-python3 /usr/local/camillagui/main.py &' &" > piCoreCDSP
+python3 /usr/local/camillagui/main.py &'
+sleep 10
+sudo -u tc sh -c '/usr/local/camilladsp -s /mnt/mmcblk0p2/tce/camilladsp/camilladsp_statefile.yml -a 127.0.0.1 -p 1234 -o /tmp/camilladsp.log &'" > piCoreCDSP
 chmod 775 piCoreCDSP
 
 
@@ -264,7 +266,10 @@ mksquashfs piCoreCDSP piCoreCDSP.tcz
 mv -f piCoreCDSP.tcz /etc/sysconfig/tcedir/optional
 echo "python3.11.tcz" > /etc/sysconfig/tcedir/optional/piCoreCDSP.tcz.dep
 echo piCoreCDSP.tcz >> /etc/sysconfig/tcedir/onboot.lst
+
+# Create symlink to startup script
 cd
+rm -f piCoreCDSP
 ln -s /tmp/tcloop/piCoreCDSP/usr/local/tce.installed/piCoreCDSP
 
 ### Saving changes and rebooting
